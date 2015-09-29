@@ -17,6 +17,7 @@
 
 
 #define DATA_SIZE  100
+#define TCP	1
 
 #define SRC_IP "192.168.0.1"
 #define DST_IP "192.168.0.100"
@@ -131,10 +132,10 @@ struct ethhdr* CreateEthernetHeader(char *src_mac, char *dst_mac, int protocol)
 
 /* Ripped from Richard Stevans Book */
 
-unsigned short ComputeChecksum(unsigned char *data, int len)
+unsigned short ComputeChecksum(unsigned char* data, int len)
 {
          long sum = 0;  /* assume 32 bit long, 16 bit short */
-	 unsigned short *temp = (unsigned short *)data;
+	 unsigned short* temp = (unsigned short *)data;
 
          while(len > 1){
              sum += *temp++;
@@ -155,18 +156,16 @@ unsigned short ComputeChecksum(unsigned char *data, int len)
 
 struct iphdr* CreateIPHeader(char* src_ip, char* dst_ip)
 {
-
-	
-	
 	/******Construct Packet*****/
 	struct iphdr* ip_header;
-
 	ip_header = (struct iphdr* )malloc(sizeof(struct iphdr));
+
+	__u16 iphdr_len =  sizeof(struct iphdr) + DATA_SIZE + (?(TCP) sizeof(struct tcphdr) : sizeof(struct icmphdr) );
 
 	ip_header->version = 4;
 	ip_header->ihl = (sizeof(struct iphdr))/4 ;
 	ip_header->tos = 0;
-	ip_header->tot_len = htons(sizeof(struct iphdr) + sizeof(struct tcphdr) + DATA_SIZE);
+	ip_header->tot_len = htons(iphdr_len);
 	ip_header->id = htons(111);
 	ip_header->frag_off = 0;
 	ip_header->ttl = 111;
@@ -185,9 +184,9 @@ struct iphdr* CreateIPHeader(char* src_ip, char* dst_ip)
 
 }
 
-struct tcphdr *CreateTcpHeader()
+struct tcphdr* CreateTcpHeader()
 {
-	struct tcphdr *tcp_header;
+	struct tcphdr* tcp_header;
 
 	/* Check /usr/include/linux/tcp.h for header definiation */
 
@@ -211,29 +210,32 @@ struct tcphdr *CreateTcpHeader()
 /*
  * ICMP_ECHO/ICMP_ECHO_REPLY prototype
  */
-struct icmp_echo
+struct icmphdr
 {
 	unsigned char type;
 	unsigned char code;
 	unsigned short checksum;
 	unsigned short identifier;
 	unsigned short sequence;
-	char data[MTU]; /* we're going to send data MTU bytes at a time */
+	// char data[MTU]; 
 };
 
 /***Create ICMP Packet***/
-struct icmp_echo CreateIcmpHeader(){
-	struct icmp_echo icmp;
+struct icmphrd* CreateIcmpHeader(){
+	icmp_header = (struct icmphdr*)malloc(sizeof(struct icmphdr));
 	
 	//populate icmp
-	icmp->code = 0;
-	icmp->type = ICMP_ECHO;
-	icmp->sequence = rand(); //Why rand()??
-	icmp->checksum = 0;
-	icmp->identifier = rand(); //Again, why?
-	icmp->data = NULL; //Nothing is in the data field currently
+	icmp_header->code = 0;
+	icmp_header->type = ICMP_ECHO;
+	icmp_header->sequence = rand(); //Why rand()??
+	icmp_header->checksum = 0;
+	icmp_header->identifier = rand(); //Again, why?
+	icmp_header->data = NULL; //Nothing is in the data field currently
+
+	//checksum
+	icmp_header->check = ComputeChecksum((unsigned char *)icmp_header, (sizeof struct icmphdr) );
 	
-	return icmp;
+	return (icmp_header);
 }
 
 CreatePseudoHeaderAndComputeTcpChecksum(struct tcphdr *tcp_header, struct iphdr *ip_header, unsigned char *data)
@@ -252,7 +254,7 @@ CreatePseudoHeaderAndComputeTcpChecksum(struct tcphdr *tcp_header, struct iphdr 
 
 	/* Fill in the pseudo header first */
 	
-	PseudoHeader *pseudo_header = (PseudoHeader *)hdr;
+	PseudoHeader* pseudo_header = (PseudoHeader *) hdr;
 
 	pseudo_header->source_ip = ip_header->saddr;
 	pseudo_header->dest_ip = ip_header->daddr;
@@ -280,24 +282,13 @@ CreatePseudoHeaderAndComputeTcpChecksum(struct tcphdr *tcp_header, struct iphdr 
 
 }
 
-unsigned char *CreateData(int len)
+unsigned char* CreateData(int len)
 {
-	unsigned char *data = (unsigned char *)malloc(len);  
-	struct timeval tv;
-	struct timezone tz;
+	unsigned char* data = (unsigned char *)malloc(len);  
 	int counter = len;	
 
-	/* get time of the day */
-	gettimeofday(&tv, &tz);
-
-	/* seed the random number generator */
-
-	srand(tv.tv_sec);
-	
-	/* Add random data for now */
-
-	for(counter = 0  ; counter < len; counter++)
-		data[counter] = 255.0 *rand()/(RAND_MAX +1.0);
+	for(counter = 0 ; counter < len; counter++)
+		data[counter] = 0;
 
 	return data;
 }
@@ -313,25 +304,13 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	
-
 	int raw;
 	unsigned char* packet;
 	struct ethhdr* ethernet_header;
 	struct iphdr* ip_header;
-	struct tcphdr* tcp_header;
 	unsigned char* data;
 	int pkt_len;
 
-
-	/******Get src/dest IP addr*****/
-	/*
-	char *src_ip, *dst_ip;
-	printf("Source IP Address: ");
-	scanf("%s", &src_ip);
-
-	printf("Destination IP Address: ");
-	scanf("%s", &dst_ip);
-	*/
 	
 	/* Create the raw socket */
 	raw = CreateRawSocket(ETH_P_ALL);
@@ -345,17 +324,17 @@ main(int argc, char **argv)
 	/* Create IP Header */
 	ip_header = CreateIPHeader(SRC_IP,DST_IP);
 
-	/* Create TCP Header */
-	tcp_header = CreateTcpHeader();
+	/* Create TCP or ICMP Header */
+	if(TCP){
+		struct tcphdr* tcp_header = CreateTcpHeader();
+		CreatePseudoHeaderAndComputeTcpChecksum(tcp_header, ip_header, data);
+	}
+	else	{struct icmphdr* icmp_header = CreateIcmpHeader();}
 
 	/* Create Data */
 	data = CreateData(DATA_SIZE);
 
-	/* Create PseudoHeader and compute TCP Checksum  */
-	CreatePseudoHeaderAndComputeTcpChecksum(tcp_header, ip_header, data);
-
-
-	/* Packet length = ETH + IP header + TCP header + Data*/
+	/* Packet length = ETH + IP header + TCP or ICMP header + Data */
 	pkt_len = sizeof(struct ethhdr) + ntohs(ip_header->tot_len);
 
 	/* Allocate memory */
@@ -367,8 +346,11 @@ main(int argc, char **argv)
 	/* Copy the IP header -- but after the ethernet header */
 	memcpy((packet + sizeof(struct ethhdr)), ip_header, ip_header->ihl*4);
 
-	/* Copy the TCP header after the IP header */
-	memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),tcp_header, tcp_header->doff*4);
+	/* Copy the TCP or ICMP header after the IP header */
+	if(TCP) 
+		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),tcp_header, tcp_header->doff*4);
+	else
+		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),icmp_header, tcp_header->doff*4);
 	
 	/* Copy the Data after the TCP header */
 	memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4 + tcp_header->doff*4), data, DATA_SIZE);
