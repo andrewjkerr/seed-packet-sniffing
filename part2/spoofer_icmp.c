@@ -245,7 +245,7 @@ struct icmphrd* CreateIcmpHeader(){
 	icmp_header->sequence = rand(); //Why rand()??
 	icmp_header->checksum = 0;
 	icmp_header->identifier = rand(); //Again, why?
-	icmp_header->data = NULL; //Nothing is in the data field currently
+	//icmp_header->data = NULL; //Nothing is in the data field currently
 
 	//checksum
 	icmp_header->check = ComputeChecksum((unsigned char *)icmp_header, (sizeof struct icmphdr) );
