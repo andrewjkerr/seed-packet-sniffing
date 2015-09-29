@@ -15,6 +15,21 @@
 #include <sys/time.h>
 #include <net/icmp.h>
 
+/*
+Added in TCP state: 0 = use ICMP, 1 = use TCP
+Added ICMP struct and CreateICMP method
+Added basic logic in main to only construct TCP or ICMP header based off of TCP state
+Modified IP header to calc size of packet based on which protocol is used
+
+Todo:
+Stitch ICMP header into packet when TCP == 0
+Re-organize code (restructure functions, abstract out final packet creation, etc)
+Code should be modular enough to easily support the addition of new protocols
+Keep defines as default values, but add ability for user to override them from CL input
+Remove unused / unneeded includes (ie time.h etc)
+Check for dangeling pointers
+Test the hell out of it
+*/
 
 #define DATA_SIZE  100
 #define TCP	1
