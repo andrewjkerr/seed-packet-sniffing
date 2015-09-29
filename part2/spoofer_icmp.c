@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/time.h>
-#include <net/icmp.h>
+#include <netinet/ip_icmp.h>
 
 /*
 Added in TCP state: 0 = use ICMP, 1 = use TCP
