@@ -17,12 +17,12 @@
 
 #define DATA_SIZE  100
 
+#define SRC_IP "192.168.0.1"
+#define DST_IP "192.168.0.100"
 #define SRC_ETHER_ADDR	"aa:aa:aa:aa:aa:aa"
-#define DST_ETHER_ADDR	"bb:bb:bb:bb:bb:bb"
-#define SRC_IP	"192.168.0.10"
-#define DST_IP	"192.168.0.11"
+#define DST_ETHER_ADDR	"ff:ff:ff:ff:ff:ff"
 #define SRC_PORT	80
-#define DST_PORT	100
+#define DST_PORT	10000
 
 typedef struct PseudoHeader{
 
@@ -33,7 +33,6 @@ typedef struct PseudoHeader{
 	unsigned short int tcp_length;
 
 }PseudoHeader;
-
 
 int CreateRawSocket(int protocol_to_sniff)
 {
@@ -153,21 +152,15 @@ unsigned short ComputeChecksum(unsigned char *data, int len)
 }
 
 
-struct iphdr *CreateIPHeader(/* Customize this as an exercise */)
+struct iphdr* CreateIPHeader(char* src_ip, char* dst_ip)
 {
-	/******Get src/dest IP addr*****/
-	char* src_ip, dst_ip;
-	printf("Source IP Address: ");
-	scanf("%s", &src_ip);
-	
-	printf("Destination IP Address: ");
-	scanf("%s", &dst_ip);
+
 	
 	
 	/******Construct Packet*****/
-	struct iphdr *ip_header;
+	struct iphdr* ip_header;
 
-	ip_header = (struct iphdr *)malloc(sizeof(struct iphdr));
+	ip_header = (struct iphdr* )malloc(sizeof(struct iphdr));
 
 	ip_header->version = 4;
 	ip_header->ihl = (sizeof(struct iphdr))/4 ;
@@ -296,69 +289,65 @@ main(int argc, char **argv)
 	
 
 	int raw;
-	unsigned char *packet;
+	unsigned char* packet;
 	struct ethhdr* ethernet_header;
-	struct iphdr *ip_header;
-	struct tcphdr  *tcp_header;
-	unsigned char *data;
+	struct iphdr* ip_header;
+	struct tcphdr* tcp_header;
+	unsigned char* data;
 	int pkt_len;
 
+
+	/******Get src/dest IP addr*****/
+	/*
+	char *src_ip, *dst_ip;
+	printf("Source IP Address: ");
+	scanf("%s", &src_ip);
+
+	printf("Destination IP Address: ");
+	scanf("%s", &dst_ip);
+	*/
 	
 	/* Create the raw socket */
-
 	raw = CreateRawSocket(ETH_P_ALL);
 
 	/* Bind raw socket to interface */
-
 	BindRawSocketToInterface(argv[1], raw, ETH_P_ALL);
 
 	/* create Ethernet header */
-
 	ethernet_header = CreateEthernetHeader(SRC_ETHER_ADDR, DST_ETHER_ADDR, ETHERTYPE_IP);
 
 	/* Create IP Header */
-
-	ip_header = CreateIPHeader();
+	ip_header = CreateIPHeader(SRC_IP,DST_IP);
 
 	/* Create TCP Header */
-
 	tcp_header = CreateTcpHeader();
 
 	/* Create Data */
-
 	data = CreateData(DATA_SIZE);
 
 	/* Create PseudoHeader and compute TCP Checksum  */
-
 	CreatePseudoHeaderAndComputeTcpChecksum(tcp_header, ip_header, data);
 
 
 	/* Packet length = ETH + IP header + TCP header + Data*/
-
 	pkt_len = sizeof(struct ethhdr) + ntohs(ip_header->tot_len);
 
 	/* Allocate memory */
-
 	packet = (unsigned char *)malloc(pkt_len);
 
 	/* Copy the Ethernet header first */
-
 	memcpy(packet, ethernet_header, sizeof(struct ethhdr));
 
 	/* Copy the IP header -- but after the ethernet header */
-
 	memcpy((packet + sizeof(struct ethhdr)), ip_header, ip_header->ihl*4);
 
 	/* Copy the TCP header after the IP header */
-
 	memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),tcp_header, tcp_header->doff*4);
 	
 	/* Copy the Data after the TCP header */
-
 	memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4 + tcp_header->doff*4), data, DATA_SIZE);
 
 	/* send the packet on the wire */
-	
 	if(!SendRawPacket(raw, packet, pkt_len))
 	{
 		perror("Error sending packet");
