@@ -365,10 +365,13 @@ main(int argc, char **argv)
 	if(TCP) 
 		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),tcp_header, tcp_header->doff*4);
 	else
-		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),icmp_header, tcp_header->doff*4);
+		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4),icmp_header, sizeof(icmphdr));
 	
-	/* Copy the Data after the TCP header */
-	memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4 + tcp_header->doff*4), data, DATA_SIZE);
+	/* Copy the Data after the TCP or ICMP header */
+	if(TCP)
+		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4 + tcp_header->doff*4), data, DATA_SIZE);
+	else
+		memcpy((packet + sizeof(struct ethhdr) + ip_header->ihl*4 + sizeof(icmphdr)), data, DATA_SIZE);
 
 	/* send the packet on the wire */
 	if(!SendRawPacket(raw, packet, pkt_len))
